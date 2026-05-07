@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #F0F4F8;
+}
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* Selection color */
+::selection {
+    background: #3B82F6;
+    color: #fff;
+}
+
+/* Sidebar link styles */
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #64748B;
+    transition: all 0.15s ease;
+}
+.sidebar-link:hover {
+    background: #EFF6FF;
+    color: #3B82F6;
+}
+.sidebar-link.active {
+    background: #EFF6FF;
+    color: #3B82F6;
+    font-weight: 600;
+}
+.sidebar-link.active svg {
+    color: #3B82F6;
+}
+
+/* Animate pulse for status dot */
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+}
+.animate-pulse-blue {
+    animation: pulse-glow 2s infinite;
+}
