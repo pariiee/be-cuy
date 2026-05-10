@@ -4,7 +4,6 @@ namespace App\Filament\Resources\DigitalProducts\Schemas;
 
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class DigitalProductForm
@@ -24,11 +23,6 @@ class DigitalProductForm
                     ->maxLength(50)
                     ->unique(ignoreRecord: true)
                     ->placeholder('e.g. CC35H'),
-                TextInput::make('app_category')
-                    ->label('Kategori Apps')
-                    ->maxLength(100)
-                    ->placeholder('e.g. Video Editing, Social Media')
-                    ->helperText('Klasifikasi jenis aplikasi produk'),
                 TextInput::make('harga_user')
                     ->label('Harga User')
                     ->required()
@@ -41,19 +35,20 @@ class DigitalProductForm
                     ->numeric()
                     ->prefix('Rp')
                     ->placeholder('45000'),
-                TextInput::make('stok')
-                    ->label('Stok')
+                TextInput::make('garansi')
+                    ->label('Garansi (hari)')
                     ->numeric()
                     ->default(0)
                     ->minValue(0)
-                    ->placeholder('10')
-                    ->helperText('Jumlah stok tersedia. 0 = habis, tidak bisa dipesan.'),
-                Toggle::make('garansi')
-                    ->label('Garansi')
-                    ->default(false),
-                Toggle::make('is_active')
-                    ->label('Aktif')
-                    ->default(true),
+                    ->placeholder('0')
+                    ->helperText('0 = tidak ada garansi'),
+                Textarea::make('stok_items')
+                    ->label('Isi Stok')
+                    ->rows(8)
+                    ->placeholder("gmail@contoh.com | password123\ngmail@contoh2.com | password456\n...")
+                    ->helperText('Satu item per baris. Setiap baris = 1 stok. Produk otomatis aktif setelah ada stok.')
+                    ->columnSpanFull()
+                    ->dehydrated(false),
                 Textarea::make('deskripsi')
                     ->label('Deskripsi')
                     ->rows(3)

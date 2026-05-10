@@ -12,14 +12,30 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
-
+use Illuminate\Support\Str;
 #[Fillable(['name', 'email', 'password', 'phone', 'balance', 'role', 'is_banned', 'ban_reason', 'api_token'])]
-#[Hidden(['password', 'remember_token', 'api_token'])]
+#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
+
+    protected static function boot(): void
+    {
+        parent::boot();
+        static::creating(function (User $user) {
+            if (empty($user->api_token)) {
+                $user->api_token = 'wtu_' . Str::random(40);
+            }
+        });
+    }
+
+    public function generateApiToken(): string
+    {
+        $token = 'wtu_' . Str::random(40);
+        $this->update(['api_token' => $token]);
+        return $token;
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -58,13 +74,6 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === 'member';
     }
 
-    /**
-     * Check if user is exempt from QRIS markup fees.
-     */
-    public function isExemptFromQrisFee(): bool
-    {
-        return $this->isAdmin() || $this->isReseller();
-    }
 
     /**
      * Check if user is exempt from product price markup.

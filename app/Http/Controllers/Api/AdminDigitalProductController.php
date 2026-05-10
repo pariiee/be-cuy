@@ -194,23 +194,23 @@ class AdminDigitalProductController extends BaseApiController
             'category_id'    => 'nullable|integer',
             'nama_produk'    => 'required|string|max:200',
             'kode_produk'    => 'required|string|max:50|unique:digital_products,kode_produk',
-            'app_category'   => 'nullable|string|max:100',
             'harga_user'     => 'required|integer|min:0',
             'harga_reseller' => 'required|integer|min:0',
-            'garansi'        => 'required|boolean',
-            'stok'           => 'integer|min:0',
+            'garansi'        => 'integer|min:0',
             'deskripsi'      => 'nullable|string|max:1000',
-            'is_active'      => 'boolean',
             'sort_order'     => 'integer|min:0',
+            'stock_items'    => 'nullable|array',
+            'stock_items.*'  => 'string',
         ]);
 
-        // Default stok to 0 if not provided
-        $validated['stok'] = $validated['stok'] ?? 0;
+        $product = DigitalProduct::create(array_merge($validated, ['stok' => 0, 'is_active' => false]));
 
-        $product = DigitalProduct::create($validated);
+        if (!empty($validated['stock_items'])) {
+            $product->addStockItems($validated['stock_items']);
+        }
 
         return $this->success([
-            'product_data' => $product->toApiArray(),
+            'product_data' => $product->fresh()->toApiArray(),
         ], 'Produk berhasil ditambahkan!', 201);
     }
 
@@ -231,17 +231,20 @@ class AdminDigitalProductController extends BaseApiController
             'category_id'    => 'sometimes|nullable|integer',
             'nama_produk'    => 'sometimes|string|max:200',
             'kode_produk'    => 'sometimes|string|max:50|unique:digital_products,kode_produk,' . $id,
-            'app_category'   => 'nullable|string|max:100',
             'harga_user'     => 'sometimes|integer|min:0',
             'harga_reseller' => 'sometimes|integer|min:0',
-            'garansi'        => 'sometimes|boolean',
-            'stok'           => 'sometimes|integer|min:0',
+            'garansi'        => 'sometimes|integer|min:0',
             'deskripsi'      => 'nullable|string|max:1000',
-            'is_active'      => 'boolean',
-            'sort_order'     => 'integer|min:0',
+            'sort_order'     => 'sometimes|integer|min:0',
+            'stock_items'    => 'nullable|array',
+            'stock_items.*'  => 'string',
         ]);
 
-        $product->update($validated);
+        $product->update(collect($validated)->except('stock_items')->toArray());
+
+        if (!empty($validated['stock_items'])) {
+            $product->addStockItems($validated['stock_items']);
+        }
 
         return $this->success([
             'product_data' => $product->fresh()->toApiArray(),
@@ -275,20 +278,22 @@ class AdminDigitalProductController extends BaseApiController
         }
 
         $validated = $request->validate([
-            'jumlah' => 'required|integer|min:1',
+            'items' => 'required|array|min:1',
+            'items.*' => 'string',
         ]);
 
         $stokSebelumnya = $product->stok;
-        $product->restock($validated['jumlah']);
+        $added = $product->addStockItems($validated['items']);
+        $fresh = $product->fresh();
 
         return $this->success([
-            'product_data' => $product->fresh()->toApiArray(),
+            'product_data' => $fresh->toApiArray(),
             'restock_info' => [
                 'stok_sebelumnya' => $stokSebelumnya,
-                'ditambahkan'     => $validated['jumlah'],
-                'stok_sekarang'   => $product->fresh()->stok,
+                'ditambahkan'     => $added,
+                'stok_sekarang'   => $fresh->stok,
             ],
-        ], "Restock berhasil! Stok {$product->nama_produk}: {$stokSebelumnya} → {$product->fresh()->stok}");
+        ], "Restock berhasil! Stok {$fresh->nama_produk}: {$stokSebelumnya} → {$fresh->stok}");
     }
 
     /**

@@ -120,10 +120,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
   <a href="/docs" class="topbar-brand">{{ config('app.name') }} <span>API</span></a>
   <span class="topbar-badge">Sandbox</span>
   <div class="token-row">
-    <label>Bearer Token:</label>
-    <input id="g-token" type="text" placeholder="Paste token dari POST /api/login ..." autocomplete="off">
+    <label>API Key:</label>
+    <input id="g-token" type="text" placeholder="wtu_... (dari POST /api/login)" autocomplete="off">
     <button class="btn-save" onclick="saveToken()">Simpan</button>
-    <span id="token-status">Belum ada token</span>
+    <span id="token-status">Belum ada key</span>
   </div>
 </header>
 
@@ -149,7 +149,7 @@ const E = [
       {n:'phone',            t:'text',     ph:'08123456789',        req:0},
     ]},
   { id:'login', grp:'Autentikasi', m:'POST', path:'/api/login', auth:false,
-    desc:'Login — dapatkan Bearer token',
+    desc:'Login — dapatkan API Key',
     body:[
       {n:'email',    t:'email',    ph:'email@example.com', req:1},
       {n:'password', t:'password', ph:'Password',           req:1},
@@ -213,7 +213,7 @@ const E = [
       {n:'product_code',   t:'text',   ph:'BBSGOP / BBSD / BBSOVON / BBSSH / ...',  req:1},
       {n:'destination',    t:'text',   ph:'08123456789',                              req:1},
       {n:'nominal',        t:'number', ph:'50000',                                    req:1},
-      {n:'payment_method', t:'select', options:['balance','qris'],                    req:1},
+      {n:'payment_method', t:'select', options:['balance','midtrans'],                req:1},
     ]},
 
   // ── TRANSAKSI OKECONNECT ──────────────────────────────────────
@@ -225,7 +225,7 @@ const E = [
       {n:'product_name',   t:'text',   ph:'Telkomsel 10rb',                           req:0},
       {n:'category',       t:'text',   ph:'pulsa / data / game / pln',               req:0},
       {n:'base_price',     t:'number', ph:'10500',                                    req:1},
-      {n:'payment_method', t:'select', options:['balance','qris'],                    req:1},
+      {n:'payment_method', t:'select', options:['balance','midtrans'],                req:1},
     ]},
 
   // ── ORDER ─────────────────────────────────────────────────────
@@ -248,16 +248,16 @@ const E = [
 
   // ── DEPOSIT ───────────────────────────────────────────────────
   { id:'deposits', grp:'Deposit', m:'GET', path:'/api/deposits', auth:true,
-    desc:'Riwayat deposit / pembayaran QRIS',
+    desc:'Riwayat deposit / pembayaran Midtrans',
     query:[{n:'purpose', ph:'deposit / order_payment', req:0}]},
   { id:'deposits-store', grp:'Deposit', m:'POST', path:'/api/deposits', auth:true,
-    desc:'Buat deposit saldo via QRIS',
-    body:[{n:'amount', t:'number', ph:'50000 (min 100, maks 2.000.000)', req:1}]},
+    desc:'Buat deposit saldo via Midtrans Snap (returns snap_token + redirect_url)',
+    body:[{n:'amount', t:'number', ph:'50000 (min 1.000)', req:1}]},
   { id:'deposits-show', grp:'Deposit', m:'GET', path:'/api/deposits/{id}', auth:true,
-    desc:'Detail deposit (termasuk QRIS string)',
+    desc:'Detail deposit (termasuk snap_token jika masih pending)',
     pp:[{n:'id', ph:'1', req:1}]},
   { id:'deposits-check', grp:'Deposit', m:'GET', path:'/api/deposits/{id}/check', auth:true,
-    desc:'Cek status pembayaran QRIS ke PayinAja',
+    desc:'Cek & sync status pembayaran Midtrans',
     pp:[{n:'id', ph:'1', req:1}]},
 
   // ── SMM PANEL ─────────────────────────────────────────────────
@@ -276,7 +276,7 @@ const E = [
       {n:'service_id',     t:'number', ph:'ID layanan (dari /api/smm/services)',     req:1},
       {n:'target',         t:'text',   ph:'https://instagram.com/username',          req:1},
       {n:'quantity',       t:'number', ph:'1000',                                    req:1},
-      {n:'payment_method', t:'select', options:['balance','qris'],                   req:1},
+      {n:'payment_method', t:'select', options:['balance','midtrans'],              req:1},
     ]},
   { id:'smm-status', grp:'SMM Panel', m:'GET', path:'/api/smm/status/{orderId}', auth:true,
     desc:'Status order SMM',
@@ -317,22 +317,65 @@ const E = [
     ]},
   { id:'inquiry-bank-codes', grp:'Inquiry', m:'GET', path:'/api/inquiry/bank-codes', auth:false,
     desc:'Kode bank untuk transfer / virtual account'},
+
+  // ── MIDTRANS ──────────────────────────────────────────────────
+  { id:'mid-snap-deposit', grp:'Midtrans', m:'POST', path:'/api/midtrans/snap', auth:true,
+    desc:'Buat Snap token untuk TOP UP SALDO',
+    body:[
+      {n:'purpose', t:'select', options:['deposit'], req:1},
+      {n:'amount',  t:'number', ph:'50000 (min 1.000)',              req:1},
+    ]},
+  { id:'mid-snap-order', grp:'Midtrans', m:'POST', path:'/api/midtrans/snap', auth:true,
+    desc:'Buat Snap token untuk membayar ORDER yang pending',
+    body:[
+      {n:'purpose',  t:'select', options:['order'], req:1},
+      {n:'order_id', t:'number', ph:'ID order yang pending', req:1},
+    ]},
+  { id:'mid-snap-trx', grp:'Midtrans', m:'POST', path:'/api/midtrans/snap', auth:true,
+    desc:'Buat order + Snap token sekaligus (untuk produk OkeConnect)',
+    body:[
+      {n:'purpose',      t:'select', options:['transaction'],      req:1},
+      {n:'product_code', t:'text',   ph:'S10 / T5 / ...',           req:1},
+      {n:'destination',  t:'text',   ph:'08123456789',               req:1},
+      {n:'product_name', t:'text',   ph:'Telkomsel 10rb',            req:0},
+      {n:'category',     t:'text',   ph:'pulsa / data / game / pln', req:0},
+      {n:'base_price',   t:'number', ph:'10500',                     req:1},
+    ]},
+  { id:'mid-status', grp:'Midtrans', m:'GET', path:'/api/midtrans/status/{invoiceNo}', auth:true,
+    desc:'Cek & sync status pembayaran Midtrans (poll dari frontend)',
+    pp:[{n:'invoiceNo', ph:'MID-DEP-1-1234567890', req:1}]},
+  { id:'mid-cancel', grp:'Midtrans', m:'POST', path:'/api/midtrans/cancel/{invoiceNo}', auth:true,
+    desc:'Batalkan transaksi Midtrans yang masih pending',
+    pp:[{n:'invoiceNo', ph:'MID-DEP-1-1234567890', req:1}]},
+  { id:'mid-webhook', grp:'Midtrans', m:'POST', path:'/api/midtrans/webhook', auth:false,
+    desc:'Webhook notifikasi dari server Midtrans (jangan dipanggil manual)',
+    body:[
+      {n:'order_id',           t:'text', ph:'MID-DEP-1-...', req:1},
+      {n:'transaction_status', t:'text', ph:'settlement',     req:1},
+      {n:'status_code',        t:'text', ph:'200',            req:1},
+      {n:'gross_amount',       t:'text', ph:'50000.00',       req:1},
+      {n:'signature_key',      t:'text', ph:'(generated by Midtrans)', req:1},
+    ]},
 ];
 
-// ── Token handling ────────────────────────────────────────────────
-let TOKEN = localStorage.getItem('sb_token') || '';
+// ── API Key handling ─────────────────────────────────────────────
+let TOKEN = localStorage.getItem('api_key') || '';
 function saveToken() {
   TOKEN = document.getElementById('g-token').value.trim();
   if (TOKEN) {
-    localStorage.setItem('sb_token', TOKEN);
-    document.getElementById('token-status').textContent = '✓ Token tersimpan';
+    localStorage.setItem('api_key', TOKEN);
+    document.getElementById('token-status').textContent = '✓ Key tersimpan';
     document.getElementById('token-status').className = 'ok';
+  } else {
+    localStorage.removeItem('api_key');
+    document.getElementById('token-status').textContent = 'Belum ada key';
+    document.getElementById('token-status').className = '';
   }
 }
 window.addEventListener('DOMContentLoaded', () => {
   if (TOKEN) {
     document.getElementById('g-token').value = TOKEN;
-    document.getElementById('token-status').textContent = '✓ Token aktif';
+    document.getElementById('token-status').textContent = '✓ Key aktif';
     document.getElementById('token-status').className = 'ok';
   }
   render();
@@ -377,7 +420,7 @@ function renderCard(e) {
   <div class="ep-head" onclick="toggleCard('${e.id}')">
     <span class="ep-method badge-m m-${e.m.toLowerCase()}">${e.m}</span>
     <span class="ep-path">${e.path}</span>
-    ${e.auth ? '<span class="ep-lock" title="Butuh Bearer token">🔒</span>' : ''}
+    ${e.auth ? '<span class="ep-lock" title="Butuh API Key (x-api-key)">🔒</span>' : ''}
     <span class="ep-desc">${e.desc}</span>
   </div>
   <div class="ep-body" id="body-${e.id}">
@@ -481,7 +524,7 @@ async function send(eid) {
   // Headers
   const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
   const tok = document.getElementById('g-token')?.value?.trim() || TOKEN;
-  if (tok) headers['Authorization'] = 'Bearer ' + tok;
+  if (tok) headers['x-api-key'] = tok;
 
   const t0 = Date.now();
   try {
@@ -492,9 +535,21 @@ async function send(eid) {
     });
     const ms = Date.now() - t0;
 
-    let text;
-    try { text = JSON.stringify(await res.json(), null, 2); }
-    catch { text = await res.text(); }
+    let parsed, text;
+    try {
+      parsed = await res.json();
+      text = JSON.stringify(parsed, null, 2);
+    } catch { text = await res.text(); }
+
+    // Auto-save api_key on successful login / verify-otp
+    if (res.ok && parsed?.data?.api_key) {
+      const key = parsed.data.api_key;
+      TOKEN = key;
+      localStorage.setItem('api_key', key);
+      document.getElementById('g-token').value = key;
+      document.getElementById('token-status').textContent = '✓ Key tersimpan otomatis';
+      document.getElementById('token-status').className = 'ok';
+    }
 
     const cls = res.status < 300 ? 'resp-2xx' : res.status < 500 ? 'resp-4xx' : 'resp-5xx';
     respStat.textContent = res.status + ' ' + res.statusText;

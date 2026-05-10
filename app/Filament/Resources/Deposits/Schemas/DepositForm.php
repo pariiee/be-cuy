@@ -55,16 +55,16 @@ class DepositForm
                             ->placeholder('Tidak ada'),
                     ])->columns(3),
 
-                Section::make('Info QRIS')
+                Section::make('Info Midtrans')
                     ->schema([
-                        TextInput::make('qris_invoiceid')
-                            ->label('QRIS Invoice ID'),
-                        TextInput::make('qris_nmid')
-                            ->label('QRIS NMID'),
-                        DateTimePicker::make('qris_request_date')
-                            ->label('Waktu Generate'),
-                        DateTimePicker::make('qris_expired_at')
-                            ->label('Expired'),
+                        TextInput::make('midtrans_snap_token')
+                            ->label('Snap Token'),
+                        TextInput::make('midtrans_transaction_id')
+                            ->label('Transaction ID'),
+                        TextInput::make('midtrans_payment_type')
+                            ->label('Tipe Pembayaran'),
+                        TextInput::make('midtrans_va_number')
+                            ->label('VA Number'),
                     ])->columns(2),
 
                 Section::make('Info Pembayar')

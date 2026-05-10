@@ -15,28 +15,22 @@ class Deposit extends Model
         'method',
         'purpose',
         'status',
-        'qris_content',
-        'qris_image_url',
-        'qris_invoiceid',
-        'qris_nmid',
-        'qris_request_date',
-        'qris_expired_at',
-        'payinaja_trx_id',
-        'payinaja_fee',
-        'payinaja_total',
         'payment_customer_name',
         'payment_method_by',
         'paid_at',
         'notes',
+        'midtrans_snap_token',
+        'midtrans_redirect_url',
+        'midtrans_transaction_id',
+        'midtrans_payment_type',
+        'midtrans_va_number',
+        'midtrans_response',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'payinaja_fee' => 'decimal:2',
-        'payinaja_total' => 'decimal:2',
-        'qris_request_date' => 'datetime',
-        'qris_expired_at' => 'datetime',
-        'paid_at' => 'datetime',
+        'amount'            => 'decimal:2',
+        'paid_at'           => 'datetime',
+        'midtrans_response' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -47,11 +41,6 @@ class Deposit extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
-    }
-
-    public function isExpired(): bool
-    {
-        return $this->qris_expired_at && now()->greaterThan($this->qris_expired_at);
     }
 
     public function isPending(): bool

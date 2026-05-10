@@ -28,7 +28,7 @@ class DepositResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'Pembayaran QRIS';
+        return 'Pembayaran Midtrans';
     }
 
     public static function getNavigationGroup(): ?string
@@ -43,7 +43,7 @@ class DepositResource extends Resource
 
     public static function getPluralModelLabel(): string
     {
-        return 'Pembayaran QRIS';
+        return 'Pembayaran Midtrans';
     }
 
     public static function form(Schema $schema): Schema

@@ -49,14 +49,18 @@ return [
         'api_key' => env('SMMPANEL_API_KEY'),
     ],
 
-    'payinaja' => [
-        'base_url' => env('PAYINAJA_BASE_URL', 'https://payinaja.web.id/api/v1'),
-        'api_key' => env('PAYINAJA_API_KEY'),
-    ],
-
     'payday' => [
         'base_url' => env('PAYDAY_BASE_URL', 'https://api.payday.my.id'),
         'key' => env('PAYDAY_API_KEY'),
+    ],
+
+    'midtrans' => [
+        'server_key'    => env('MIDTRANS_SERVER_KEY'),
+        'client_key'    => env('MIDTRANS_CLIENT_KEY'),
+        'merchant_id'   => env('MIDTRANS_MERCHANT_ID'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+        'is_sanitized'  => true,
+        'is_3ds'        => true,
     ],
 
 ];

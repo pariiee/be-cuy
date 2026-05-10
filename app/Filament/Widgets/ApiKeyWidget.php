@@ -23,8 +23,8 @@ class ApiKeyWidget extends Widget
     {
         $user = auth()->user();
 
-        // Auto-generate token on first visit if none exists
-        if (! $user->api_token) {
+        // Auto-generate key on first visit if none exists
+        if (empty($user->api_token) || ! str_starts_with($user->api_token, 'wtu_')) {
             $this->generateToken();
         }
     }
@@ -49,20 +49,14 @@ class ApiKeyWidget extends Widget
     public function generateToken(): void
     {
         $user = auth()->user();
-
-        // Delete old "api-key" named Sanctum tokens
-        $user->tokens()->where('name', 'api-key')->delete();
-
-        // Create new Sanctum token and store plain text
-        $plain = $user->createToken('api-key')->plainTextToken;
-        $user->update(['api_token' => $plain]);
+        $user->generateApiToken();
 
         $this->revealed = true;
         $this->editMode = false;
 
         Notification::make()
             ->title('API Key berhasil diperbarui')
-            ->body('Token baru telah dibuat. Perbarui token di /docs.')
+            ->body('API Key baru telah dibuat. Perbarui di semua client Anda.')
             ->success()
             ->send();
     }

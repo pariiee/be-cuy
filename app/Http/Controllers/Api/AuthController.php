@@ -68,11 +68,9 @@ class AuthController extends BaseApiController
             return $this->error('Akun Anda telah dibanned. Hubungi admin untuk informasi lebih lanjut.', 403);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
-
         return $this->success([
-            'user' => $user,
-            'token' => $token,
+            'user'    => $user,
+            'api_key' => $user->api_token,
         ], 'Login successful');
     }
 
@@ -117,11 +115,11 @@ class AuthController extends BaseApiController
         $otpRecord->update(['used_at' => now()]);
         $user->update(['email_verified_at' => now()]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $fresh = $user->fresh();
 
         return $this->success([
-            'user'  => $user->fresh(),
-            'token' => $token,
+            'user'    => $fresh,
+            'api_key' => $fresh->api_token,
         ], 'Email berhasil diverifikasi. Selamat datang!');
     }
 
@@ -169,8 +167,6 @@ class AuthController extends BaseApiController
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-
         return $this->success(null, 'Logged out successfully');
     }
 
@@ -186,9 +182,24 @@ class AuthController extends BaseApiController
             'role'              => $user->role,
             'balance'           => (float) $user->balance,
             'is_banned'         => (bool) $user->is_banned,
+            'api_key'           => $user->api_token,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'created_at'        => $user->created_at->toIso8601String(),
         ]);
+    }
+
+    /**
+     * POST /api/me/regenerate-key
+     *
+     * Regenerate the API key for the authenticated user.
+     */
+    public function regenerateApiKey(Request $request)
+    {
+        $newKey = $request->user()->generateApiToken();
+
+        return $this->success([
+            'api_key' => $newKey,
+        ], 'API Key berhasil diperbarui.');
     }
 
     /**
@@ -319,9 +330,6 @@ class AuthController extends BaseApiController
             'password'       => Hash::make($validated['password']),
             'remember_token' => Str::random(60),
         ]);
-
-        // Revoke all existing tokens for security
-        $user->tokens()->delete();
 
         return $this->success(null, 'Password berhasil direset. Silakan login kembali.');
     }

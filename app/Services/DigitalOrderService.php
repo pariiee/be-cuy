@@ -21,10 +21,14 @@ class DigitalOrderService
      *
      * @return array{success: bool, data: array|null, message: string}
      */
-    public function placeOrder(string $kodeProduk, int $quantity = 1, string $userType = 'user'): array
-    {
-        return DB::transaction(function () use ($kodeProduk, $quantity, $userType) {
-            // Lock the product row for update to prevent race conditions
+    public function placeOrder(
+        string $kodeProduk,
+        int $quantity = 1,
+        string $userType = 'user',
+        ?int $userId = null,
+        ?string $orderRef = null
+    ): array {
+        return DB::transaction(function () use ($kodeProduk, $quantity, $userType, $userId, $orderRef) {
             $product = DigitalProduct::where('kode_produk', $kodeProduk)
                 ->lockForUpdate()
                 ->first();
@@ -45,20 +49,29 @@ class DigitalOrderService
                 return $this->fail("Stok tidak mencukupi. Tersedia: {$product->stok}, diminta: {$quantity}.");
             }
 
-            // Decrease stock
-            $product->decrement('stok', $quantity);
+            // Grab stock items (one per quantity)
+            $deliveryItems = [];
+            for ($i = 0; $i < $quantity; $i++) {
+                $item = $product->grabStockItem($userId, $orderRef);
+                if (!$item) {
+                    return $this->fail('Stok produk habis saat diproses.');
+                }
+                $deliveryItems[] = $item->content;
+            }
 
-            $price = $product->getPriceFor($userType);
+            $price      = $product->getPriceFor($userType);
             $totalPrice = $price * $quantity;
+            $fresh      = $product->fresh();
 
             return [
                 'success' => true,
                 'data'    => [
-                    'product'     => $product->fresh()->toApiArray($userType),
-                    'quantity'    => $quantity,
-                    'unit_price'  => $price,
-                    'total_price' => $totalPrice,
-                    'sisa_stok'   => $product->fresh()->stok,
+                    'product'    => $fresh->toApiArray($userType),
+                    'quantity'   => $quantity,
+                    'unit_price' => $price,
+                    'total_price'=> $totalPrice,
+                    'delivery'   => count($deliveryItems) === 1 ? $deliveryItems[0] : $deliveryItems,
+                    'sisa_stok'  => $fresh->stok,
                 ],
                 'message' => 'Order berhasil diproses!',
             ];

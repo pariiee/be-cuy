@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DigitalProduct extends Model
 {
@@ -13,7 +14,6 @@ class DigitalProduct extends Model
         'category_id',
         'nama_produk',
         'kode_produk',
-        'app_category',
         'harga_user',
         'harga_reseller',
         'garansi',
@@ -26,10 +26,45 @@ class DigitalProduct extends Model
     protected $casts = [
         'harga_user'     => 'integer',
         'harga_reseller' => 'integer',
-        'garansi'        => 'boolean',
+        'garansi'        => 'integer',
         'is_active'      => 'boolean',
         'stok'           => 'integer',
     ];
+
+    public function stocks(): HasMany
+    {
+        return $this->hasMany(DigitalProductStock::class, 'product_id');
+    }
+
+    public function availableStocks(): HasMany
+    {
+        return $this->hasMany(DigitalProductStock::class, 'product_id')->where('is_sold', false);
+    }
+
+    /**
+     * Sync stok cache and is_active from available stock items.
+     */
+    public function syncStok(): void
+    {
+        $count = $this->stocks()->where('is_sold', false)->count();
+        $this->update([
+            'stok'      => $count,
+            'is_active' => $count > 0,
+        ]);
+    }
+
+    /**
+     * Add multiple stock items from an array of content strings.
+     */
+    public function addStockItems(array $lines): int
+    {
+        $items = array_filter(array_map('trim', $lines));
+        foreach ($items as $content) {
+            $this->stocks()->create(['content' => $content]);
+        }
+        $this->syncStok();
+        return count($items);
+    }
 
     /**
      * Relationship: Product belongs to a category.
@@ -74,24 +109,39 @@ class DigitalProduct extends Model
     }
 
     /**
-     * Decrease stock by given amount. Returns false if insufficient stock.
-     */
-    public function decreaseStock(int $amount = 1): bool
-    {
-        if ($this->stok < $amount) {
-            return false;
-        }
-
-        $this->decrement('stok', $amount);
-        return true;
-    }
-
-    /**
-     * Restock: increase stock by given amount.
+     * Legacy restock kept for compatibility — prefer addStockItems().
      */
     public function restock(int $amount): void
     {
         $this->increment('stok', $amount);
+        $this->update(['is_active' => true]);
+    }
+
+    /**
+     * Grab one available stock item, mark as sold, return it.
+     * Returns null if no stock available.
+     */
+    public function grabStockItem(?int $userId = null, ?string $orderRef = null): ?DigitalProductStock
+    {
+        $item = $this->stocks()
+            ->where('is_sold', false)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $item) {
+            return null;
+        }
+
+        $item->update([
+            'is_sold'          => true,
+            'sold_at'          => now(),
+            'sold_to_user_id'  => $userId,
+            'order_ref'        => $orderRef,
+        ]);
+
+        $this->syncStok();
+
+        return $item;
     }
 
     /**
@@ -111,8 +161,6 @@ class DigitalProduct extends Model
             'id'             => $this->id,
             'nama_produk'    => $this->nama_produk,
             'kode_produk'    => $this->kode_produk,
-            'kategori'       => 'PRODUCTV1',
-            'app_category'   => $this->app_category,
             'harga_user'     => $this->harga_user,
             'harga_reseller' => $this->harga_reseller,
             'stok'           => $this->stok,

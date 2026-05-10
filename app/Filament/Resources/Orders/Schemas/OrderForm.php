@@ -74,7 +74,7 @@ class OrderForm
                     ->label('Metode Bayar')
                     ->options([
                         'balance' => 'Saldo',
-                        'qris' => 'QRIS',
+                        'midtrans' => 'Midtrans',
                     ])
                     ->default('balance')
                     ->required(),

@@ -10,6 +10,15 @@ class EditDigitalProduct extends EditRecord
 {
     protected static string $resource = DigitalProductResource::class;
 
+    protected function afterSave(): void
+    {
+        $raw = $this->data['stok_items'] ?? '';
+        if (filled($raw)) {
+            $lines = explode("\n", $raw);
+            $this->record->addStockItems($lines);
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [

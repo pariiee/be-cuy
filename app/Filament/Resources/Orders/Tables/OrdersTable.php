@@ -68,12 +68,12 @@ class OrdersTable
                     ->badge()
                     ->formatStateUsing(fn (string $state) => match ($state) {
                         'balance' => 'Saldo',
-                        'qris' => 'QRIS',
+                        'midtrans' => 'Midtrans',
                         default => $state,
                     })
                     ->color(fn (string $state) => match ($state) {
                         'balance' => 'gray',
-                        'qris' => 'warning',
+                        'midtrans' => 'info',
                         default => 'gray',
                     }),
                 TextColumn::make('total_pay')

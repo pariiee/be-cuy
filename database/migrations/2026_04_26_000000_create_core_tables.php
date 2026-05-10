@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -47,6 +46,7 @@ return new class extends Migration
             $table->enum('status', ['pending', 'processing', 'completed', 'failed', 'refunded'])->default('pending');
             $table->json('provider_response')->nullable();
             $table->text('notes')->nullable();
+            $table->string('sn')->nullable();
             $table->timestamps();
 
             $table->index('user_id');
@@ -63,22 +63,19 @@ return new class extends Migration
             $table->foreignId('order_id')->nullable()->constrained('orders')->nullOnDelete();
             $table->string('invoice_number')->unique();
             $table->decimal('amount', 14, 2);
-            $table->string('method')->default('qris');
+            $table->string('method')->default('midtrans');
             $table->string('purpose')->default('deposit');
             $table->enum('status', ['pending', 'paid', 'expired', 'failed'])->default('pending');
-            $table->text('qris_content')->nullable();
-            $table->text('qris_image_url')->nullable();
-            $table->string('qris_invoiceid')->nullable()->index();
-            $table->string('qris_nmid')->nullable();
-            $table->timestamp('qris_request_date')->nullable();
-            $table->timestamp('qris_expired_at')->nullable();
-            $table->string('payinaja_trx_id')->nullable()->index();
-            $table->decimal('payinaja_fee', 14, 2)->nullable();
-            $table->decimal('payinaja_total', 14, 2)->nullable();
             $table->string('payment_customer_name')->nullable();
             $table->string('payment_method_by')->nullable();
             $table->timestamp('paid_at')->nullable();
             $table->text('notes')->nullable();
+            $table->string('midtrans_snap_token')->nullable();
+            $table->string('midtrans_redirect_url')->nullable();
+            $table->string('midtrans_transaction_id')->nullable()->index();
+            $table->string('midtrans_payment_type')->nullable();
+            $table->string('midtrans_va_number')->nullable();
+            $table->json('midtrans_response')->nullable();
             $table->timestamps();
 
             $table->index('user_id');
@@ -97,7 +94,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // ── QRIS Fees ────────────────────────────────────────────────
+        // ── QRIS Fees (legacy — kept for admin UI compatibility) ─────
         Schema::create('qris_fees', function (Blueprint $table) {
             $table->id();
             $table->enum('purpose', ['deposit', 'transaction'])->unique();
@@ -108,7 +105,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // ── QRIS Markup Settings (single-row) ────────────────────────
+        // ── QRIS Markup Settings (legacy — kept for admin UI compatibility) ─
         Schema::create('qris_markup_settings', function (Blueprint $table) {
             $table->id();
             $table->enum('markup_deposit_type', ['fixed', 'percentage'])->default('fixed');
@@ -119,7 +116,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::table('qris_markup_settings')->insert([
+        \Illuminate\Support\Facades\DB::table('qris_markup_settings')->insert([
             'markup_deposit_type'      => 'fixed',
             'markup_deposit_value'     => 0,
             'markup_transaction_type'  => 'fixed',

@@ -230,10 +230,10 @@
     <button id="modeToggle" onclick="toggleMode()" style="border:none;padding:2px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;background:#166534;color:#bbf7d0;transition:all .2s;" title="Klik untuk ganti mode">SANDBOX</button>
     <a href="/docs/sandbox" style="background:#1e2030;color:#818cf8;border:1px solid #374151;border-radius:4px;padding:2px 10px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;" title="Buka API Sandbox Lengkap">⚡ Full Sandbox</a>
     <div class="token-wrap">
-        <label for="apiToken"><i class="bi bi-key"></i> Bearer Token:</label>
-        <input type="password" id="apiToken" placeholder="Token Sanctum..." autocomplete="off">
-        <button class="btn-save-token" onclick="saveToken()">Simpan</button>
-        <span class="token-status" id="tokenStatus">Belum ada token</span>
+        <label for="apiKeyInput"><i class="bi bi-key"></i> API Key:</label>
+        <input type="password" id="apiKeyInput" placeholder="wtu_..." autocomplete="off">
+        <button class="btn-save-token" onclick="saveCredentials()">Simpan</button>
+        <span class="token-status" id="tokenStatus">Belum ada key</span>
     </div>
     <a href="/admin" style="color:#6b7280;font-size:12px;text-decoration:none;margin-left:8px;" title="Kembali ke Filament">
         <i class="bi bi-house"></i>
@@ -251,6 +251,7 @@
     <a href="#reset-password" class="sidebar-link"><span class="method-pill pill-post">POST</span> Reset Password</a>
     <a href="#logout" class="sidebar-link"><span class="method-pill pill-post">POST</span> Logout</a>
     <a href="#me" class="sidebar-link"><span class="method-pill pill-get">GET</span> Profil</a>
+    <a href="#regenerate-key" class="sidebar-link"><span class="method-pill pill-post">POST</span> Regenerate API Key</a>
     <a href="#update-me" class="sidebar-link"><span class="method-pill pill-put">PUT</span> Update Profil</a>
     <a href="#change-password" class="sidebar-link"><span class="method-pill pill-put">PUT</span> Ganti Password</a>
 
@@ -273,15 +274,16 @@
     <a href="#inquiry-products" class="sidebar-link"><span class="method-pill pill-get">GET</span> Produk Inquiry</a>
 
     <div class="sidebar-section-title">Transaksi</div>
+    <a href="#digital-order" class="sidebar-link"><span class="method-pill pill-post">POST</span> Beli Produk Digital</a>
     <a href="#transactions" class="sidebar-link"><span class="method-pill pill-post">POST</span> Buat Transaksi</a>
     <a href="#orders-list" class="sidebar-link"><span class="method-pill pill-get">GET</span> Riwayat Order</a>
     <a href="#orders-show" class="sidebar-link"><span class="method-pill pill-get">GET</span> Detail Order</a>
     <a href="#orders-invoice" class="sidebar-link"><span class="method-pill pill-get">GET</span> Invoice</a>
 
     <div class="sidebar-section-title">Deposit / Top Up</div>
-    <a href="#deposits-store" class="sidebar-link"><span class="method-pill pill-post">POST</span> Buat QRIS</a>
+    <a href="#deposits-store" class="sidebar-link"><span class="method-pill pill-post">POST</span> Buat Deposit</a>
     <a href="#deposits-list" class="sidebar-link"><span class="method-pill pill-get">GET</span> Riwayat Deposit</a>
-    <a href="#deposits-check" class="sidebar-link"><span class="method-pill pill-get">GET</span> Cek Status QRIS</a>
+    <a href="#deposits-check" class="sidebar-link"><span class="method-pill pill-get">GET</span> Cek Status Pembayaran</a>
 
     <div class="sidebar-section-title">SMM Panel</div>
     <a href="#smm-apps-ref" class="sidebar-link" style="font-size:12px;"><i class="bi bi-table me-1"></i> Ref. Layanan per App</a>
@@ -301,7 +303,7 @@
 
     <div class="docs-hero">
         <h1>{{ config('app.name') }} — API Reference</h1>
-        <p>Dokumentasi lengkap semua endpoint REST API. Masukkan Bearer Token di pojok kanan atas untuk mencoba endpoint langsung dari halaman ini.</p>
+        <p>Dokumentasi lengkap semua endpoint REST API. Semua endpoint (kecuali Register/Login/OTP) wajib menyertakan <code>x-api-key</code> di header. Endpoint bertanda <span style="background:#fef9c3;color:#a16207;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;">Auth Required</span> butuh API Key dari akun yang sudah login.</p>
     </div>
 
     <div class="base-url-banner">
@@ -322,6 +324,44 @@
     @php
     $baseUrl = rtrim(config('app.url'), '/');
     @endphp
+
+    {{-- Auth Info Box --}}
+    <div style="background:#1e2030;border:1px solid #374151;border-left:4px solid #818cf8;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <i class="bi bi-key-fill" style="color:#818cf8;font-size:18px;"></i>
+            <span style="color:#e5e7eb;font-weight:700;font-size:15px;">Cara Menggunakan API Key</span>
+        </div>
+        <p style="color:#9ca3af;font-size:13px;margin-bottom:12px;">
+            Setelah <strong style="color:#e5e7eb;">login</strong> atau <strong style="color:#e5e7eb;">verify-otp</strong>, kamu mendapat <code style="color:#818cf8;">api_key</code>.
+            Sertakan di <strong style="color:#e5e7eb;">setiap request</strong> — baik yang bertanda
+            <span style="background:#f0fdf4;color:#15803d;font-size:10px;padding:1px 8px;border-radius:20px;font-weight:600;">Public</span> maupun
+            <span style="background:#fef9c3;color:#a16207;font-size:10px;padding:1px 8px;border-radius:20px;font-weight:600;">Auth Required</span>.
+            Cukup satu header, tidak perlu Bearer Token.
+        </p>
+        <div style="margin-bottom:10px;">
+            <span style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">HEADER</span>
+            <div style="background:#111827;border-radius:6px;padding:10px 14px;margin-top:6px;font-family:monospace;font-size:13px;">
+                <span style="color:#818cf8;">x-api-key</span><span style="color:#9ca3af;">: </span><span style="color:#fbbf24;">wtu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+            </div>
+        </div>
+        <div style="margin-bottom:14px;">
+            <span style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">CONTOH CURL</span>
+            <div style="background:#111827;border-radius:6px;padding:10px 14px;margin-top:6px;font-family:monospace;font-size:12px;color:#e5e7eb;white-space:pre-wrap;word-break:break-all;">curl -X GET {{ rtrim(config('app.url'), '/') }}/api/me \
+  -H <span style="color:#fbbf24;">"x-api-key: wtu_xxxxxxxx..."</span> \
+  -H <span style="color:#fbbf24;">"Accept: application/json"</span></div>
+        </div>
+        <div style="background:#111827;border-radius:6px;padding:10px 14px;margin-bottom:14px;">
+            <span style="color:#6b7280;font-size:11px;text-transform:uppercase;">FORMAT API KEY</span>
+            <div style="margin-top:6px;font-family:monospace;font-size:12px;">
+                <span style="color:#34d399;">wtu_</span><span style="color:#e5e7eb;">xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>
+                <span style="color:#6b7280;"> (44 karakter)</span>
+            </div>
+        </div>
+        <p style="color:#6b7280;font-size:12px;margin:0;">
+            <i class="bi bi-info-circle me-1"></i>
+            Masukkan API Key di kolom <strong style="color:#9ca3af;">API Key</strong> pojok kanan atas untuk mencoba endpoint langsung dari halaman ini.
+        </p>
+    </div>
 
     {{-- Register --}}
     <div class="endpoint-card" id="register">
@@ -603,7 +643,7 @@
             <i class="bi bi-chevron-down chevron"></i>
         </div>
         <div class="endpoint-body">
-            <p class="endpoint-desc">Hapus token yang sedang aktif (logout). Membutuhkan header <code>Authorization: Bearer {token}</code>.</p>
+            <p class="endpoint-desc">Logout dari sesi aktif. Membutuhkan header <code>x-api-key</code>.</p>
             <button class="btn-try" onclick="openTester(this, 'POST', '/api/logout', true, null)">
                 <i class="bi bi-play-fill"></i> Coba Endpoint
             </button>
@@ -638,6 +678,32 @@
   }
 }</code></pre><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
             <button class="btn-try" onclick="openTester(this, 'GET', '/api/me', true, null)">
+                <i class="bi bi-play-fill"></i> Coba Endpoint
+            </button>
+            <div class="tester-container"></div>
+        </div>
+    </div>
+
+    {{-- Regenerate API Key --}}
+    <div class="endpoint-card" id="regenerate-key">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+            <span class="method-badge badge-post">POST</span>
+            <span class="endpoint-path">/api/me/regenerate-key</span>
+            <span class="endpoint-title d-none d-md-inline">Regenerate API Key</span>
+            <span class="badge-auth">Auth Required</span>
+            <i class="bi bi-chevron-down chevron"></i>
+        </div>
+        <div class="endpoint-body">
+            <p class="endpoint-desc">Generate ulang API Key akun kamu. Key lama langsung tidak bisa dipakai — update semua client yang menggunakan key lama.</p>
+            <div class="code-label">Contoh Response <span class="text-success">200</span></div>
+            <div class="code-wrap"><pre><code class="language-json">{
+  "success": true,
+  "message": "API Key berhasil diperbarui.",
+  "data": {
+    "api_key": "wtu_newKeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+}</code></pre><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+            <button class="btn-try" onclick="openTester(this, 'POST', '/api/me/regenerate-key', true, null)">
                 <i class="bi bi-play-fill"></i> Coba Endpoint
             </button>
             <div class="tester-container"></div>
@@ -943,7 +1009,7 @@
                     <tr><td><span class="param-name">product_code</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> Kode provider dari <code>/api/ewallet/options</code> (misal: <code>BBSGOP</code>)</td></tr>
                     <tr><td><span class="param-name">destination</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> Nomor HP terdaftar di e-wallet</td></tr>
                     <tr><td><span class="param-name">nominal</span></td><td><span class="param-type">integer</span></td><td><span class="param-required">wajib</span> Jumlah top up dalam Rupiah (min: 10.000, max: 1.000.000)</td></tr>
-                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>qris</code></td></tr>
+                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>midtrans</code></td></tr>
                 </tbody>
             </table>
             <div class="code-wrap mb-3"><pre><code class="language-json">// Request
@@ -1171,11 +1237,167 @@
     </div>
 
     {{-- ════════════════════════════════════════
+         BELI PRODUK DIGITAL
+    ════════════════════════════════════════ --}}
+    <div class="endpoint-card" id="digital-order">
+        <div class="endpoint-header" onclick="toggleEndpoint(this)">
+            <span class="method-badge badge-post">POST</span>
+            <span class="endpoint-path">/api/digital/order</span>
+            <span class="endpoint-title d-none d-md-inline">Beli produk digital</span>
+            <span class="badge-auth">Auth Required</span>
+            <span class="badge-rate">10/menit</span>
+            <i class="bi bi-chevron-down chevron"></i>
+        </div>
+        <div class="endpoint-body">
+            <p class="endpoint-desc">Beli produk digital (akun, voucher, dll). Mendukung 2 metode pembayaran: <strong>saldo (balance)</strong> — delivery langsung di response, atau <strong>QRIS</strong> — bayar dulu, delivery tersedia di detail order setelah pembayaran dikonfirmasi. Harga otomatis disesuaikan berdasarkan role user (<strong>harga_user</strong> atau <strong>harga_reseller</strong>).</p>
+
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
+                <strong style="color:#92400e;"><i class="bi bi-info-circle me-1"></i>Alur Pembelian (Saldo):</strong>
+                <ol style="color:#78350f;font-size:13px;margin:8px 0 0;padding-left:20px;">
+                    <li>Lihat daftar produk via <code>GET /api/digital/products</code> atau <code>GET /api/productv1</code></li>
+                    <li>Pastikan saldo cukup (cek via <code>GET /api/me</code>)</li>
+                    <li>Kirim <code>POST /api/digital/order</code> dengan <code>payment_method: "balance"</code></li>
+                    <li>Terima isi akun/voucher di field <code>delivery</code> pada response</li>
+                </ol>
+                <strong style="color:#92400e;margin-top:12px;display:block;"><i class="bi bi-qr-code me-1"></i>Alur Pembelian (QRIS):</strong>
+                <ol style="color:#78350f;font-size:13px;margin:8px 0 0;padding-left:20px;">
+                    <li>Kirim <code>POST /api/digital/order</code> dengan <code>payment_method: "qris"</code></li>
+                    <li>Gunakan <code>snap_token</code> / <code>redirect_url</code> untuk menampilkan QRIS</li>
+                    <li>Setelah pembayaran dikonfirmasi, akun/voucher otomatis tersedia di <code>GET /api/orders/{id}</code> (field <code>sn</code>)</li>
+                </ol>
+            </div>
+
+            <div class="code-label">Request Body</div>
+            <table class="params-table mb-3">
+                <thead><tr><th>Field</th><th>Tipe</th><th>Keterangan</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="param-name">kode_produk</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> Kode produk digital (dari <code>/api/digital/products</code>)</td></tr>
+                    <tr><td><span class="param-name">quantity</span></td><td><span class="param-type">integer</span></td><td><span class="param-optional">opsional</span> Jumlah (default: 1, max: 10)</td></tr>
+                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-optional">opsional</span> <code>balance</code> (default) atau <code>qris</code></td></tr>
+                </tbody>
+            </table>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="code-label">Contoh Request</div>
+                    <div class="code-wrap"><pre><code class="language-json">{
+  "kode_produk": "CC35H",
+  "quantity": 1
+}</code></pre><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="code-label">Contoh Response <span class="text-success">200</span></div>
+                    <div class="code-wrap"><pre><code class="language-json">{
+  "status": true,
+  "message": "Pembelian berhasil! Cek delivery untuk detail akun/voucher.",
+  "data": {
+    "order_id": 55,
+    "order_ref": "DIG-1746...",
+    "produk": "CAPCUT 35H",
+    "kode_produk": "CC35H",
+    "quantity": 1,
+    "harga_satuan": 15000,
+    "total_bayar": 15000,
+    "delivery": "email@contoh.com | password123",
+    "sisa_stok": 4,
+    "balance_remaining": 85000,
+    "status": "completed"
+  }
+}</code></pre></div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="code-label">Contoh Request (QRIS)</div>
+                    <div class="code-wrap"><pre><code class="language-json">{
+  "kode_produk": "CC35H",
+  "quantity": 1,
+  "payment_method": "qris"
+}</code></pre><button class="btn-copy" onclick="copyCode(this)">Copy</button></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="code-label">Response (QRIS) <span class="text-warning">201</span></div>
+                    <div class="code-wrap"><pre><code class="language-json">{
+  "status": true,
+  "message": "Silakan selesaikan pembayaran via QRIS.",
+  "data": {
+    "order_id": 57,
+    "order_ref": "DIG-1746...",
+    "produk": "CAPCUT 35H",
+    "kode_produk": "CC35H",
+    "quantity": 1,
+    "harga_satuan": 15000,
+    "total_bayar": 15000,
+    "payment_method": "qris",
+    "snap_token": "abc123...",
+    "redirect_url": "https://app.midtrans.com/snap/v4/...",
+    "client_key": "Mid-client-xxx",
+    "status": "pending"
+  }
+}</code></pre></div>
+                </div>
+            </div>
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #22c55e;border-radius:8px;padding:12px 18px;margin-top:12px;margin-bottom:4px;">
+                <strong style="color:#166534;font-size:13px;"><i class="bi bi-check-circle me-1"></i>Setelah QRIS dibayar:</strong>
+                <p style="color:#15803d;font-size:12px;margin:6px 0 0;">Midtrans webhook otomatis memproses order. Cek detail via <code>GET /api/orders/{order_id}</code> — field <code>sn</code> berisi isi akun/voucher. Status berubah dari <code>pending</code> → <code>completed</code>.</p>
+            </div>
+
+            <div class="code-label mt-3">Error Responses</div>
+            <table class="params-table">
+                <thead><tr><th>HTTP Code</th><th>Kondisi</th><th>Message</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="param-type">404</span></td><td>Produk tidak ditemukan</td><td><code>Produk tidak ditemukan.</code></td></tr>
+                    <tr><td><span class="param-type">422</span></td><td>Produk nonaktif</td><td><code>Produk sedang tidak aktif.</code></td></tr>
+                    <tr><td><span class="param-type">422</span></td><td>Stok habis / kurang</td><td><code>Stok tidak mencukupi. Tersedia: X, diminta: Y.</code></td></tr>
+                    <tr><td><span class="param-type">422</span></td><td>Saldo kurang (balance)</td><td><code>Saldo tidak cukup. Dibutuhkan Rp..., saldo Anda Rp...</code></td></tr>
+                    <tr><td><span class="param-type">503</span></td><td>QRIS belum dikonfigurasi</td><td><code>Pembayaran QRIS belum dikonfigurasi.</code></td></tr>
+                    <tr><td><span class="param-type">502</span></td><td>Gagal buat QRIS</td><td><code>Gagal membuat pembayaran QRIS. Coba lagi nanti.</code></td></tr>
+                </tbody>
+            </table>
+
+            <div class="sandbox-form">
+                <div class="sandbox-form-title"><i class="bi bi-terminal me-1"></i>Sandbox — Beli Produk Digital</div>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <div class="sf-row">
+                            <label class="sf-label">kode_produk <span>*</span></label>
+                            <input type="text" class="sf-input" id="digorder-kode" placeholder="CC35H" value="CC35H">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="sf-row">
+                            <label class="sf-label">quantity</label>
+                            <input type="number" class="sf-input" id="digorder-qty" placeholder="1" value="1" min="1" max="10">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="sf-row">
+                            <label class="sf-label">payment_method</label>
+                            <select class="sf-select" id="digorder-method">
+                                <option value="balance">balance (Saldo)</option>
+                                <option value="qris">qris (QRIS)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="sf-footer">
+                    <button class="btn-send" onclick="sendDigitalOrder()"><i class="bi bi-send"></i> Beli Sekarang</button>
+                    <span class="tester-status" id="digorder-status"></span>
+                </div>
+                <div class="sf-response" id="digorder-resp" style="display:none;">
+                    <pre><code class="language-json" id="digorder-code"></code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ════════════════════════════════════════
          TRANSAKSI
     ════════════════════════════════════════ --}}
     <div class="section-header" id="transaksi">
         <h2><i class="bi bi-lightning-charge text-danger me-2"></i>Transaksi</h2>
-        <p>Buat transaksi top-up via OkeConnect H2H. Pembayaran bisa dengan saldo atau QRIS.</p>
+        <p>Buat transaksi top-up via OkeConnect H2H. Pembayaran bisa dengan saldo atau Midtrans.</p>
     </div>
     <hr class="section-divider">
 
@@ -1188,14 +1410,14 @@
             <i class="bi bi-chevron-down chevron"></i>
         </div>
         <div class="endpoint-body">
-            <p class="endpoint-desc">Buat transaksi top-up melalui OkeConnect. Jika <code>payment_method=balance</code>, saldo dipotong langsung. Jika <code>payment_method=qris</code>, dikembalikan QR code untuk dibayar.</p>
+            <p class="endpoint-desc">Buat transaksi top-up melalui OkeConnect. Jika <code>payment_method=balance</code>, saldo dipotong langsung. Jika <code>payment_method=midtrans</code>, dikembalikan <code>snap_token</code> untuk dibayar via Midtrans.</p>
             <table class="params-table mb-3">
                 <thead><tr><th>Field</th><th>Tipe</th><th>Keterangan</th></tr></thead>
                 <tbody>
                     <tr><td><span class="param-name">product_code</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> Kode produk OkeConnect</td></tr>
                     <tr><td><span class="param-name">destination</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> Nomor/ID tujuan</td></tr>
                     <tr><td><span class="param-name">base_price</span></td><td><span class="param-type">numeric</span></td><td><span class="param-required">wajib</span> Harga dasar produk</td></tr>
-                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>qris</code></td></tr>
+                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>midtrans</code></td></tr>
                     <tr><td><span class="param-name">product_name</span></td><td><span class="param-type">string</span></td><td><span class="param-optional">opsional</span> Nama produk</td></tr>
                     <tr><td><span class="param-name">category</span></td><td><span class="param-type">string</span></td><td><span class="param-optional">opsional</span> Kategori produk</td></tr>
                 </tbody>
@@ -1322,7 +1544,7 @@
     ════════════════════════════════════════ --}}
     <div class="section-header" id="deposit">
         <h2><i class="bi bi-wallet2 text-info me-2"></i>Deposit / Top Up Saldo</h2>
-        <p>Isi saldo akun via pembayaran QRIS.</p>
+        <p>Isi saldo akun via Midtrans Snap. Setelah dapat <code>snap_token</code>, buka Snap popup di frontend untuk memilih metode bayar (transfer, QRIS, dll).</p>
     </div>
     <hr class="section-divider">
 
@@ -1330,16 +1552,16 @@
         <div class="endpoint-header" onclick="toggleEndpoint(this)">
             <span class="method-badge badge-post">POST</span>
             <span class="endpoint-path">/api/deposits</span>
-            <span class="endpoint-title d-none d-md-inline">Buat QRIS top up</span>
+            <span class="endpoint-title d-none d-md-inline">Buat deposit via Midtrans</span>
             <span class="badge-auth">Auth Required</span>
             <i class="bi bi-chevron-down chevron"></i>
         </div>
         <div class="endpoint-body">
-            <p class="endpoint-desc">Generate QR Code untuk top up saldo. QR berlaku 15 menit. Cek status via <code>GET /api/deposits/{id}/check</code>.</p>
+            <p class="endpoint-desc">Generate Snap token Midtrans untuk top up saldo. Gunakan <code>snap_token</code> di frontend dengan Midtrans Snap.js. Cek status via <code>GET /api/deposits/{id}/check</code>.</p>
             <table class="params-table mb-3">
                 <thead><tr><th>Field</th><th>Tipe</th><th>Keterangan</th></tr></thead>
                 <tbody>
-                    <tr><td><span class="param-name">amount</span></td><td><span class="param-type">integer</span></td><td><span class="param-required">wajib</span> Nominal (100 – 2.000.000)</td></tr>
+                    <tr><td><span class="param-name">amount</span></td><td><span class="param-type">integer</span></td><td><span class="param-required">wajib</span> Nominal (min 1.000)</td></tr>
                 </tbody>
             </table>
             <div class="row g-3">
@@ -1351,27 +1573,26 @@
                 <div class="col-md-6">
                     <div class="code-wrap"><pre><code class="language-json">{
   "success": true,
-  "message": "QRIS berhasil dibuat. Scan dan bayar dalam 15 menit.",
+  "message": "Snap token berhasil dibuat. Selesaikan pembayaran via Midtrans.",
   "data": {
     "deposit_id": 5,
-    "invoice_number": "DEP-20260501-0001",
+    "invoice_no": "MID-DEP-1-1746834000",
     "amount": 50000,
-    "total_amount": 51500,
-    "qris_content": "00020101...",
-    "qris_image_url": "https://...",
-    "expired_at": "2026-05-01T00:15:00+07:00"
+    "snap_token": "66e4fa55-fdac-4ef9-91b5-733b97d1b862",
+    "redirect_url": "https://app.sandbox.midtrans.com/snap/v2/vtweb/...",
+    "client_key": "SB-Mid-client-xxxx"
   }
 }</code></pre></div>
                 </div>
             </div>
             <div class="sandbox-form">
-                <div class="sandbox-form-title"><i class="bi bi-terminal me-1"></i>Sandbox — Buat QRIS <span style="background:#374151;color:#818cf8;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:400;margin-left:4px;">Auth Required</span></div>
+                <div class="sandbox-form-title"><i class="bi bi-terminal me-1"></i>Sandbox — Buat Deposit Midtrans <span style="background:#374151;color:#818cf8;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:400;margin-left:4px;">Auth Required</span></div>
                 <div class="sf-row">
-                    <label class="sf-label">amount <span>*</span> <span style="color:#6b7280;font-size:10px;">nominal top up (bukan total bayar)</span></label>
-                    <input type="number" class="sf-input" id="dep-amount" placeholder="50000" value="50000" min="100" max="2000000">
+                    <label class="sf-label">amount <span>*</span> <span style="color:#6b7280;font-size:10px;">nominal deposit (min 1.000)</span></label>
+                    <input type="number" class="sf-input" id="dep-amount" placeholder="50000" value="50000" min="1000">
                 </div>
                 <div class="sf-footer">
-                    <button class="btn-send" onclick="sendDeposit()"><i class="bi bi-qr-code"></i> Buat QRIS</button>
+                    <button class="btn-send" onclick="sendDeposit()"><i class="bi bi-credit-card"></i> Buat Deposit</button>
                     <span class="tester-status" id="dep-status"></span>
                 </div>
                 <div class="sf-response" id="dep-resp" style="display:none;">
@@ -1407,12 +1628,12 @@
         <div class="endpoint-header" onclick="toggleEndpoint(this)">
             <span class="method-badge badge-get">GET</span>
             <span class="endpoint-path">/api/deposits/{id}/check</span>
-            <span class="endpoint-title d-none d-md-inline">Cek status QRIS</span>
+            <span class="endpoint-title d-none d-md-inline">Cek status pembayaran</span>
             <span class="badge-auth">Auth Required</span>
             <i class="bi bi-chevron-down chevron"></i>
         </div>
         <div class="endpoint-body">
-            <p class="endpoint-desc">Cek apakah QRIS sudah dibayar. Status: <code>unpaid</code> → <code>paid</code> / <code>expired</code>. Berlaku untuk QRIS deposit saldo maupun QRIS pembayaran order.</p>
+            <p class="endpoint-desc">Cek & sync status pembayaran Midtrans. Status: <code>pending</code> → <code>paid</code> / <code>failed</code>. Berlaku untuk deposit saldo maupun pembayaran order.</p>
             <div class="code-label">Contoh Response (paid) <span class="text-success">200</span></div>
             <div class="code-wrap"><pre><code class="language-json">{
   "success": true,
@@ -1656,7 +1877,7 @@
                     <tr><td><span class="param-name">service</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> ID layanan dari /smm/search atau /smm/services</td></tr>
                     <tr><td><span class="param-name">target</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> URL/username target</td></tr>
                     <tr><td><span class="param-name">quantity</span></td><td><span class="param-type">integer</span></td><td><span class="param-required">wajib</span> Jumlah order (harus antara <code>min_order</code>–<code>max_order</code>)</td></tr>
-                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>qris</code></td></tr>
+                    <tr><td><span class="param-name">payment_method</span></td><td><span class="param-type">string</span></td><td><span class="param-required">wajib</span> <code>balance</code> atau <code>midtrans</code></td></tr>
                     <tr><td><span class="param-name">base_price</span></td><td><span class="param-type">numeric</span></td><td><span class="param-required">wajib</span> Harga dari /smm/search atau /smm/services</td></tr>
                     <tr><td><span class="param-name">service_name</span></td><td><span class="param-type">string</span></td><td><span class="param-optional">opsional</span> Nama layanan (untuk catatan order)</td></tr>
                     <tr><td><span class="param-name">category</span></td><td><span class="param-type">string</span></td><td><span class="param-optional">opsional</span> Nama kategori/app (untuk markup)</td></tr>
@@ -1808,30 +2029,23 @@
         localStorage.setItem('ref_' + bodyId, isOpen ? '0' : '1');
     }
 
-    // ── Token Management ──
-    function saveToken() {
-        const val = document.getElementById('apiToken').value.trim();
-        if (val) {
-            localStorage.setItem('api_token', val);
-            updateTokenStatus(true);
-        } else {
-            localStorage.removeItem('api_token');
-            updateTokenStatus(false);
-        }
+    // ── Credentials Management ──
+    function saveCredentials() {
+        const apiKey = document.getElementById('apiKeyInput').value.trim();
+        if (apiKey) localStorage.setItem('api_key', apiKey); else localStorage.removeItem('api_key');
+        updateTokenStatus(!!apiKey);
     }
-    function getToken() { return localStorage.getItem('api_token') || ''; }
-    function updateTokenStatus(hasToken) {
+    function getApiKey() { return localStorage.getItem('api_key') || ''; }
+    function getToken()  { return getApiKey(); }
+    function updateTokenStatus(hasKey) {
         const el = document.getElementById('tokenStatus');
-        el.textContent = hasToken ? '✓ Token aktif' : 'Belum ada token';
-        el.className = 'token-status' + (hasToken ? ' active' : '');
+        el.textContent = hasKey ? '✓ Key aktif' : 'Belum ada key';
+        el.className = 'token-status' + (hasKey ? ' active' : '');
     }
-    // Server-provided token (from admin session)
-    const SERVER_TOKEN = @json($apiToken ?? null);
 
-    // Load token on page load: server token takes priority
+    // Load credentials on page load
     window.addEventListener('DOMContentLoaded', () => {
         applyMode();
-        // Restore ref toggle state (default: closed)
         ['inquiry-ref-body', 'okeconnect-ref-body', 'smm-apps-ref-body'].forEach(id => {
             const saved = localStorage.getItem('ref_' + id);
             if (saved === '1') {
@@ -1841,14 +2055,9 @@
                 if (btn) btn.textContent = '−';
             }
         });
-        if (SERVER_TOKEN) {
-            localStorage.setItem('api_token', SERVER_TOKEN);
-        }
-        const saved = getToken();
-        if (saved) {
-            document.getElementById('apiToken').value = saved;
-            updateTokenStatus(true);
-        }
+        const savedKey = getApiKey();
+        if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+        updateTokenStatus(!!savedKey);
     });
 
     // ── Endpoint Toggle ──
@@ -1913,8 +2122,8 @@
         const respEl   = document.getElementById(`tresp_${key}`);
         const codeEl   = document.getElementById(`tcode_${key}`);
 
-        if (needsAuth && !getToken()) {
-            statusEl.textContent = '⚠ Masukkan token dulu di atas';
+        if (needsAuth && !getApiKey()) {
+            statusEl.textContent = '⚠ Masukkan API Key di atas';
             statusEl.style.color = '#f59e0b';
             return;
         }
@@ -1924,7 +2133,7 @@
         statusEl.textContent = '';
 
         const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (needsAuth) headers['Authorization'] = 'Bearer ' + getToken();
+        if (getApiKey()) headers['x-api-key'] = getApiKey();
 
         let body = undefined;
         if (hasBody) {
@@ -1956,8 +2165,8 @@
 
     // ── Form Sandbox Helpers ──
     async function sfSend(statusEl, respEl, codeEl, sendBtn, method, path, body, needsAuth) {
-        if (needsAuth && !getToken()) {
-            statusEl.textContent = '⚠ Masukkan token dulu di atas';
+        if (needsAuth && !getApiKey()) {
+            statusEl.textContent = '⚠ Masukkan API Key di atas';
             statusEl.style.color = '#f59e0b';
             return;
         }
@@ -1966,7 +2175,7 @@
         sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         statusEl.textContent = '';
         const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (needsAuth) headers['Authorization'] = 'Bearer ' + getToken();
+        if (getApiKey()) headers['x-api-key'] = getApiKey();
         try {
             const res = await fetch(BASE_URL + path, { method, headers, body: JSON.stringify(body) });
             const text = await res.text();
@@ -2018,13 +2227,13 @@
                 password: document.getElementById('login-password').value,
             }, false
         );
-        // Auto-save token on successful login
-        if (result && result.ok && result.data?.data?.token) {
-            const token = result.data.data.token;
-            localStorage.setItem('api_token', token);
-            document.getElementById('apiToken').value = token;
+        // Auto-save api_key on successful login
+        if (result && result.ok && result.data?.data?.api_key) {
+            const key = result.data.data.api_key;
+            localStorage.setItem('api_key', key);
+            document.getElementById('apiKeyInput').value = key;
             updateTokenStatus(true);
-            document.getElementById('login-status').innerHTML += ' &nbsp;✓ <span style="color:#34d399;">Token tersimpan otomatis!</span>';
+            document.getElementById('login-status').innerHTML += ' &nbsp;✓ <span style="color:#34d399;">API Key tersimpan!</span>';
         }
     }
 
@@ -2043,6 +2252,29 @@
             document.getElementById('dep-code'),
             btn, 'POST', '/api/deposits', { amount }, true
         );
+    }
+
+    // ── Digital Order Sandbox ──
+    async function sendDigitalOrder() {
+        const btn = document.getElementById('digorder-resp').previousElementSibling.querySelector('.btn-send');
+        const kode = document.getElementById('digorder-kode').value.trim();
+        const qty = parseInt(document.getElementById('digorder-qty').value, 10) || 1;
+        const method = document.getElementById('digorder-method').value;
+        if (!kode) {
+            document.getElementById('digorder-status').textContent = '⚠ Masukkan kode_produk';
+            document.getElementById('digorder-status').className = 'tester-status status-4xx';
+            return;
+        }
+        const result = await sfSend(
+            document.getElementById('digorder-status'),
+            document.getElementById('digorder-resp'),
+            document.getElementById('digorder-code'),
+            btn, 'POST', '/api/digital/order',
+            { kode_produk: kode, quantity: qty, payment_method: method }, true
+        );
+        if (result && result.ok && result.data?.data?.redirect_url) {
+            document.getElementById('digorder-status').innerHTML += ' &nbsp;<a href="' + result.data.data.redirect_url + '" target="_blank" style="color:#818cf8;">Buka QRIS →</a>';
+        }
     }
 
     // ── Inquiry Sandbox ──

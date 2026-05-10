@@ -7,8 +7,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Forms\Components\Textarea;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -31,16 +30,6 @@ class DigitalProductsTable
                     ->searchable()
                     ->sortable()
                     ->limit(40),
-                TextColumn::make('category.nama_kategori')
-                    ->label('Kategori')
-                    ->badge()
-                    ->color('info')
-                    ->sortable(),
-                TextColumn::make('app_category')
-                    ->label('Apps')
-                    ->badge()
-                    ->color('warning')
-                    ->placeholder('—'),
                 TextColumn::make('harga_user')
                     ->label('Harga User')
                     ->money('IDR', locale: 'id')
@@ -50,17 +39,16 @@ class DigitalProductsTable
                     ->money('IDR', locale: 'id')
                     ->sortable()
                     ->color('success'),
-                IconColumn::make('garansi')
+                TextColumn::make('garansi')
                     ->label('Garansi')
-                    ->boolean(),
+                    ->formatStateUsing(fn ($state) => $state ? "{$state} hari" : '—')
+                    ->badge()
+                    ->color('info'),
                 TextColumn::make('stok')
                     ->label('Stok')
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger')
                     ->formatStateUsing(fn ($state) => $state > 0 ? $state : 'Habis'),
-                IconColumn::make('is_active')
-                    ->label('Aktif')
-                    ->boolean(),
             ])
             ->filters([
                 SelectFilter::make('category_id')
@@ -69,42 +57,26 @@ class DigitalProductsTable
             ])
             ->recordActions([
                 Action::make('restock')
-                    ->label('Restock')
+                    ->label('Tambah Stok')
                     ->icon('heroicon-o-plus-circle')
                     ->color('success')
                     ->form([
-                        TextInput::make('tambah_stok')
-                            ->label('Tambah Stok')
-                            ->numeric()
+                        Textarea::make('items')
+                            ->label('Item Stok Baru')
+                            ->rows(8)
                             ->required()
-                            ->minValue(1)
-                            ->placeholder('Jumlah stok yang ditambahkan')
-                            ->helperText('Stok akan ditambahkan ke jumlah saat ini'),
+                            ->placeholder("gmail@contoh.com | password123\ngmail@contoh2.com | password456\n...")
+                            ->helperText('Satu item per baris. Setiap baris = 1 stok.'),
                     ])
                     ->action(function ($record, array $data) {
-                        $record->restock((int) $data['tambah_stok']);
-                    })
-                    ->after(function ($record) {
+                        $lines = explode("\n", $data['items']);
+                        $added = $record->addStockItems($lines);
                         \Filament\Notifications\Notification::make()
-                            ->title('Restock Berhasil!')
-                            ->body("Stok {$record->nama_produk} sekarang: {$record->fresh()->stok}")
+                            ->title('Stok Ditambahkan!')
+                            ->body("{$added} item ditambahkan. Total stok: {$record->fresh()->stok}")
                             ->success()
                             ->send();
                     }),
-                Action::make('set_stok')
-                    ->label('Set Stok')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('warning')
-                    ->form([
-                        TextInput::make('stok')
-                            ->label('Jumlah Stok Baru')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0)
-                            ->placeholder('Atur jumlah stok secara manual'),
-                    ])
-                    ->fillForm(fn ($record) => ['stok' => $record->stok])
-                    ->action(fn ($record, array $data) => $record->update(['stok' => (int) $data['stok']])),
                 EditAction::make(),
                 DeleteAction::make(),
             ])

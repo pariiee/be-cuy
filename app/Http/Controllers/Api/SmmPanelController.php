@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Deposit;
 use App\Models\Order;
 use App\Models\ProductMarkup;
+use App\Services\MidtransService;
 use App\Services\SmmPanelService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,7 +15,8 @@ use Illuminate\Support\Str;
 class SmmPanelController extends BaseApiController
 {
     public function __construct(
-        protected SmmPanelService $smm
+        protected SmmPanelService $smm,
+        protected MidtransService $midtrans
     ) {}
 
     /**
@@ -192,7 +195,7 @@ class SmmPanelController extends BaseApiController
             'service_name' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:100',
             'base_price' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:balance,qris',
+            'payment_method' => 'required|in:balance,midtrans',
         ]);
 
         $user = $request->user();
@@ -204,25 +207,13 @@ class SmmPanelController extends BaseApiController
         $markupModel = ProductMarkup::findMarkup('smmpanel', $serviceId, $validated['category'] ?? null);
         $markupAmount = $markupModel ? $markupModel->calculateMarkup($basePrice) : 0;
         $sellPrice = $basePrice + $markupAmount;
-
-        // Calculate QRIS fee if applicable
-        $paymentService = app(\App\Services\PaymentService::class);
-        $paymentFee = 0;
-        if ($paymentMethod === 'qris') {
-            if (!$paymentService->isQrisEnabled()) {
-                return $this->error('Pembayaran QRIS sedang tidak tersedia', 422);
-            }
-            $paymentFee = $paymentService->calculateQrisFee($sellPrice);
-        }
-
-        $totalPay = $sellPrice + $paymentFee;
         $refId = 'SMM-' . time() . '-' . Str::random(6);
 
         if ($paymentMethod === 'balance') {
             return $this->processSmmWithBalance($user, $validated, $basePrice, $markupAmount, $sellPrice, $refId, $serviceId);
         }
 
-        return $this->processSmmWithQris($user, $validated, $basePrice, $markupAmount, $sellPrice, $paymentFee, $totalPay, $refId, $serviceId, $paymentService);
+        return $this->processSmmWithMidtrans($user, $validated, $basePrice, $markupAmount, $sellPrice, $refId, $serviceId);
     }
 
     private function processSmmWithBalance($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, string $refId, string $serviceId)
@@ -289,48 +280,69 @@ class SmmPanelController extends BaseApiController
         ], 'Order SMM diproses');
     }
 
-    private function processSmmWithQris($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, float $paymentFee, float $totalPay, string $refId, string $serviceId, $paymentService)
+    private function processSmmWithMidtrans($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, string $refId, string $serviceId)
     {
-        $order = Order::create([
-            'user_id' => $user->id,
-            'provider' => 'smmpanel',
-            'order_ref' => $refId,
-            'product_code' => $serviceId,
-            'product_name' => $validated['service_name'] ?? null,
-            'category' => $validated['category'] ?? null,
-            'target' => $validated['target'],
-            'quantity' => $validated['quantity'],
-            'base_price' => $basePrice,
-            'markup' => $markupAmount,
-            'sell_price' => $sellPrice,
-            'profit' => $markupAmount,
-            'payment_method' => 'qris',
-            'payment_fee' => $paymentFee,
-            'total_pay' => $totalPay,
-            'payment_status' => 'belum',
-            'status' => 'pending',
-        ]);
-
-        $deposit = $paymentService->createQrisForOrder($order, $totalPay);
-
-        if ($deposit === null) {
-            $order->update(['status' => 'failed', 'notes' => 'Gagal generate QRIS']);
-            return $this->error('Gagal membuat QRIS. Coba lagi nanti.', 502);
+        if (!$this->midtrans->isEnabled()) {
+            return $this->error('Pembayaran Midtrans belum dikonfigurasi.', 503);
         }
 
+        $invoiceNo = 'MID-SMM-' . time() . '-' . Str::random(4);
+
+        $order = Order::create([
+            'user_id'        => $user->id,
+            'provider'       => 'smmpanel',
+            'order_ref'      => $refId,
+            'product_code'   => $serviceId,
+            'product_name'   => $validated['service_name'] ?? null,
+            'category'       => $validated['category'] ?? null,
+            'target'         => $validated['target'],
+            'quantity'       => $validated['quantity'],
+            'base_price'     => $basePrice,
+            'markup'         => $markupAmount,
+            'sell_price'     => $sellPrice,
+            'profit'         => $markupAmount,
+            'payment_method' => 'midtrans',
+            'payment_fee'    => 0,
+            'total_pay'      => $sellPrice,
+            'payment_status' => 'belum',
+            'status'         => 'pending',
+        ]);
+
+        $snap = $this->midtrans->createSnapToken([
+            'order_id'     => $invoiceNo,
+            'gross_amount' => (int) $sellPrice,
+            'name'         => $validated['service_name'] ?? ('SMM Order #' . $serviceId),
+            'customer'     => ['first_name' => $user->name, 'email' => $user->email, 'phone' => $user->phone ?? ''],
+        ]);
+
+        if (!$snap) {
+            $order->update(['status' => 'failed', 'notes' => 'Gagal generate Snap token']);
+            return $this->error('Gagal membuat pembayaran Midtrans. Coba lagi nanti.', 502);
+        }
+
+        Deposit::create([
+            'user_id'               => $user->id,
+            'order_id'              => $order->id,
+            'invoice_number'        => $invoiceNo,
+            'amount'                => $sellPrice,
+            'method'                => 'midtrans',
+            'purpose'               => 'order_payment',
+            'status'                => 'pending',
+            'midtrans_snap_token'   => $snap['snap_token'],
+            'midtrans_redirect_url' => $snap['redirect_url'],
+        ]);
+
         return $this->success([
-            'order_id' => $order->id,
-            'ref_id' => $refId,
-            'payment_method' => 'qris',
-            'sell_price' => $sellPrice,
-            'payment_fee' => $paymentFee,
-            'total_pay' => $totalPay,
-            'qris_content' => $deposit->qris_content,
-            'qris_nmid' => $deposit->qris_nmid,
-            'qris_expired_at' => $deposit->qris_expired_at->toIso8601String(),
-            'deposit_id' => $deposit->id,
-            'status' => 'pending',
-        ], 'Silakan scan QRIS untuk pembayaran', 201);
+            'order_id'       => $order->id,
+            'ref_id'         => $refId,
+            'invoice_no'     => $invoiceNo,
+            'payment_method' => 'midtrans',
+            'sell_price'     => $sellPrice,
+            'snap_token'     => $snap['snap_token'],
+            'redirect_url'   => $snap['redirect_url'],
+            'client_key'     => config('services.midtrans.client_key'),
+            'status'         => 'pending',
+        ], 'Silakan selesaikan pembayaran via Midtrans', 201);
     }
 
     /**

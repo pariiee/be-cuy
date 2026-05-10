@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Deposit;
 use App\Models\Order;
 use App\Models\ProductMarkup;
 use App\Models\User;
+use App\Services\MidtransService;
 use App\Services\OkeConnectService;
-use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,7 +16,7 @@ class TransactionController extends BaseApiController
 {
     public function __construct(
         protected OkeConnectService $okeConnect,
-        protected PaymentService $payment
+        protected MidtransService $midtrans
     ) {}
 
     /**
@@ -29,7 +30,7 @@ class TransactionController extends BaseApiController
      *   "product_name": "Telkomsel 10rb",
      *   "category": "pulsa",
      *   "base_price": 10000,
-     *   "payment_method": "balance"  // "balance" or "qris"
+     *   "payment_method": "balance"  // "balance" or "midtrans"
      * }
      */
     public function store(Request $request)
@@ -40,7 +41,7 @@ class TransactionController extends BaseApiController
             'product_name'   => 'nullable|string|max:255',
             'category'       => 'nullable|string|max:100',
             'base_price'     => 'required|numeric|min:0',
-            'payment_method' => 'required|in:balance,qris',
+            'payment_method' => 'required|in:balance,midtrans',
         ], [
             'destination.regex' => 'Nomor tujuan harus berupa angka (6-20 digit).',
         ]);
@@ -56,30 +57,19 @@ class TransactionController extends BaseApiController
             $markupAmount = $markupModel ? $markupModel->calculateMarkup($basePrice) : 0;
         }
         $sellPrice = $basePrice + $markupAmount;
-
-        // Calculate QRIS fee if applicable
-        $paymentFee = 0;
-        if ($paymentMethod === 'qris') {
-            if (!$this->payment->isQrisEnabled()) {
-                return $this->error('Pembayaran QRIS sedang tidak tersedia', 422);
-            }
-            $paymentFee = $this->payment->calculateQrisFee($sellPrice, 'transaction', $user);
-        }
-
-        $totalPay = $sellPrice + $paymentFee;
-        $refId = 'TRX-' . time() . '-' . Str::random(6);
+        $refId     = 'TRX-' . time() . '-' . Str::random(6);
 
         if ($paymentMethod === 'balance') {
-            return $this->processWithBalance($user, $validated, $basePrice, $markupAmount, $sellPrice, $paymentFee, $totalPay, $refId);
+            return $this->processWithBalance($user, $validated, $basePrice, $markupAmount, $sellPrice, $refId);
         }
 
-        return $this->processWithQris($user, $validated, $basePrice, $markupAmount, $sellPrice, $paymentFee, $totalPay, $refId);
+        return $this->processWithMidtrans($user, $validated, $basePrice, $markupAmount, $sellPrice, $refId);
     }
 
     /**
      * Pay with user balance — deduct immediately and send to provider.
      */
-    private function processWithBalance($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, float $paymentFee, float $totalPay, string $refId)
+    private function processWithBalance($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, string $refId)
     {
         // Quick pre-check (not final, real check inside DB lock below)
         if ($user->balance < $sellPrice) {
@@ -166,52 +156,70 @@ class TransactionController extends BaseApiController
     }
 
     /**
-     * Pay with QRIS — create order as pending, generate QR, wait for payment.
+     * Pay with Midtrans Snap — create order as pending, generate Snap token.
      */
-    private function processWithQris($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, float $paymentFee, float $totalPay, string $refId)
+    private function processWithMidtrans($user, array $validated, float $basePrice, float $markupAmount, float $sellPrice, string $refId)
     {
-        // Create order as pending (waiting for QRIS payment)
-        $order = Order::create([
-            'user_id' => $user->id,
-            'provider' => 'okeconnect',
-            'order_ref' => $refId,
-            'product_code' => $validated['product_code'],
-            'product_name' => $validated['product_name'] ?? null,
-            'category' => $validated['category'] ?? null,
-            'target' => $validated['destination'],
-            'quantity' => 1,
-            'base_price' => $basePrice,
-            'markup' => $markupAmount,
-            'sell_price' => $sellPrice,
-            'profit' => $markupAmount,
-            'payment_method' => 'qris',
-            'payment_fee' => $paymentFee,
-            'total_pay' => $totalPay,
-            'payment_status' => 'belum',
-            'status' => 'pending',
-        ]);
-
-        // Generate QRIS
-        $deposit = $this->payment->createQrisForOrder($order, $totalPay);
-
-        if ($deposit === null) {
-            $order->update(['status' => 'failed', 'notes' => 'Gagal generate QRIS']);
-            return $this->error('Gagal membuat QRIS. Coba lagi nanti.', 502);
+        if (!$this->midtrans->isEnabled()) {
+            return $this->error('Pembayaran Midtrans belum dikonfigurasi.', 503);
         }
 
+        $invoiceNo = 'MID-TRX-' . time() . '-' . Str::random(4);
+
+        $order = Order::create([
+            'user_id'        => $user->id,
+            'provider'       => 'okeconnect',
+            'order_ref'      => $refId,
+            'product_code'   => $validated['product_code'],
+            'product_name'   => $validated['product_name'] ?? null,
+            'category'       => $validated['category'] ?? null,
+            'target'         => $validated['destination'],
+            'quantity'       => 1,
+            'base_price'     => $basePrice,
+            'markup'         => $markupAmount,
+            'sell_price'     => $sellPrice,
+            'profit'         => $markupAmount,
+            'payment_method' => 'midtrans',
+            'payment_fee'    => 0,
+            'total_pay'      => $sellPrice,
+            'payment_status' => 'belum',
+            'status'         => 'pending',
+        ]);
+
+        $snap = $this->midtrans->createSnapToken([
+            'order_id'     => $invoiceNo,
+            'gross_amount' => (int) $sellPrice,
+            'name'         => $validated['product_name'] ?? ('Top-up ' . $validated['product_code']),
+            'customer'     => ['first_name' => $user->name, 'email' => $user->email, 'phone' => $user->phone ?? ''],
+        ]);
+
+        if (!$snap) {
+            $order->update(['status' => 'failed', 'notes' => 'Gagal generate Snap token']);
+            return $this->error('Gagal membuat pembayaran Midtrans. Coba lagi nanti.', 502);
+        }
+
+        Deposit::create([
+            'user_id'               => $user->id,
+            'order_id'              => $order->id,
+            'invoice_number'        => $invoiceNo,
+            'amount'                => $sellPrice,
+            'method'                => 'midtrans',
+            'purpose'               => 'order_payment',
+            'status'                => 'pending',
+            'midtrans_snap_token'   => $snap['snap_token'],
+            'midtrans_redirect_url' => $snap['redirect_url'],
+        ]);
+
         return $this->success([
-            'order_id' => $order->id,
-            'ref_id' => $refId,
-            'payment_method' => 'qris',
-            'sell_price' => $sellPrice,
-            'payment_fee' => $paymentFee,
-            'total_pay' => $totalPay,
-            'qris_content' => $deposit->qris_content,
-            'qris_image_url' => $deposit->qris_image_url,
-            'payinaja_trx_id' => $deposit->payinaja_trx_id,
-            'qris_expired_at' => $deposit->qris_expired_at->toIso8601String(),
-            'deposit_id' => $deposit->id,
-            'status' => 'pending',
-        ], 'Silakan scan QRIS untuk pembayaran', 201);
+            'order_id'     => $order->id,
+            'ref_id'       => $refId,
+            'invoice_no'   => $invoiceNo,
+            'payment_method' => 'midtrans',
+            'sell_price'   => $sellPrice,
+            'snap_token'   => $snap['snap_token'],
+            'redirect_url' => $snap['redirect_url'],
+            'client_key'   => config('services.midtrans.client_key'),
+            'status'       => 'pending',
+        ], 'Silakan selesaikan pembayaran via Midtrans', 201);
     }
 }
