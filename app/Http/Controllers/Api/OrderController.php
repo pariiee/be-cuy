@@ -90,6 +90,7 @@ class OrderController extends BaseApiController
         $paymentMethodLabel = match ($order->payment_method) {
             'balance'  => 'Saldo',
             'midtrans' => 'Midtrans',
+            'qris'     => 'QRIS',
             default    => $order->payment_method,
         };
 

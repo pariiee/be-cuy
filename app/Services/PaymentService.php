@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\DigitalProduct;
 use App\Models\Order;
+use App\Models\User;
 use App\Services\OkeConnectService;
 use App\Services\SmmPanelService;
 
@@ -86,7 +86,12 @@ class PaymentService
             );
 
             if (!$result['success']) {
-                $order->update(['status' => 'failed', 'notes' => $result['message']]);
+                // Refund ke saldo user karena pembayaran QRIS sudah masuk tapi stok habis
+                User::lockForUpdate()->find($order->user_id)?->increment('balance', (float) $order->total_pay);
+                $order->update([
+                    'status' => 'failed',
+                    'notes'  => $result['message'] . ' — Dana Rp' . number_format($order->total_pay, 0, ',', '.') . ' dikembalikan ke saldo.',
+                ]);
                 return;
             }
 
