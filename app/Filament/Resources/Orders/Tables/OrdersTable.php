@@ -28,9 +28,16 @@ class OrdersTable
                     ->searchable(),
                 TextColumn::make('provider')
                     ->badge()
+                    ->formatStateUsing(fn (string $state) => match ($state) {
+                        'okeconnect' => 'OkeConnect',
+                        'smmpanel' => 'SMM Panel',
+                        'digital' => 'Digital',
+                        default => ucfirst($state),
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'okeconnect' => 'success',
                         'smmpanel' => 'info',
+                        'digital' => 'warning',
                         default => 'gray',
                     }),
                 TextColumn::make('product_name')
@@ -69,11 +76,13 @@ class OrdersTable
                     ->formatStateUsing(fn (string $state) => match ($state) {
                         'balance' => 'Saldo',
                         'midtrans' => 'Midtrans',
+                        'qris' => 'QRIS',
                         default => $state,
                     })
                     ->color(fn (string $state) => match ($state) {
                         'balance' => 'gray',
                         'midtrans' => 'info',
+                        'qris' => 'purple',
                         default => 'gray',
                     }),
                 TextColumn::make('total_pay')
@@ -96,6 +105,7 @@ class OrdersTable
                     ->options([
                         'okeconnect' => 'OkeConnect',
                         'smmpanel' => 'SMM Panel',
+                        'digital' => 'Produk Digital',
                     ]),
                 SelectFilter::make('status')
                     ->options([

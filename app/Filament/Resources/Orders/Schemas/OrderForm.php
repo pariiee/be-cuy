@@ -22,6 +22,7 @@ class OrderForm
                     ->options([
                         'okeconnect' => 'OkeConnect',
                         'smmpanel' => 'SMM Panel',
+                        'digital' => 'Produk Digital',
                     ])
                     ->required(),
                 TextInput::make('order_ref')
@@ -75,6 +76,7 @@ class OrderForm
                     ->options([
                         'balance' => 'Saldo',
                         'midtrans' => 'Midtrans',
+                        'qris' => 'QRIS',
                     ])
                     ->default('balance')
                     ->required(),

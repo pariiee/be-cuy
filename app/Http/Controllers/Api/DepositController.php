@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\MidtransService;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DepositController extends BaseApiController
 {
@@ -108,22 +109,30 @@ class DepositController extends BaseApiController
             );
 
             if ($newStatus !== $deposit->status) {
-                $deposit->update([
-                    'status'                  => $newStatus,
-                    'midtrans_transaction_id' => $live['transaction_id'] ?? $deposit->midtrans_transaction_id,
-                    'midtrans_payment_type'   => $live['payment_type'] ?? $deposit->midtrans_payment_type,
-                    'paid_at'                 => $newStatus === 'paid' ? now() : $deposit->paid_at,
-                    'payment_method_by'       => $live['payment_type'] ?? $deposit->payment_method_by,
-                ]);
-
-                if ($newStatus === 'paid') {
-                    if ($deposit->purpose === 'deposit') {
-                        User::lockForUpdate()->find($deposit->user_id)?->increment('balance', (float) $deposit->amount);
-                    } elseif ($deposit->purpose === 'order_payment' && $deposit->order_id) {
-                        $deposit->order?->update(['payment_status' => 'lunas']);
-                        $this->payment->fulfillOrder($deposit->order);
+                // Use lockForUpdate to prevent race condition with webhook
+                DB::transaction(function () use ($deposit, $newStatus, $live) {
+                    $locked = Deposit::lockForUpdate()->find($deposit->id);
+                    if (!$locked || in_array($locked->status, ['paid', 'failed'])) {
+                        return; // Already processed by webhook
                     }
-                }
+
+                    $locked->update([
+                        'status'                  => $newStatus,
+                        'midtrans_transaction_id' => $live['transaction_id'] ?? $locked->midtrans_transaction_id,
+                        'midtrans_payment_type'   => $live['payment_type'] ?? $locked->midtrans_payment_type,
+                        'paid_at'                 => $newStatus === 'paid' ? now() : $locked->paid_at,
+                        'payment_method_by'       => $live['payment_type'] ?? $locked->payment_method_by,
+                    ]);
+
+                    if ($newStatus === 'paid') {
+                        if ($locked->purpose === 'deposit') {
+                            User::lockForUpdate()->find($locked->user_id)?->increment('balance', (float) $locked->amount);
+                        } elseif ($locked->purpose === 'order_payment' && $locked->order_id) {
+                            $locked->order?->update(['payment_status' => 'lunas']);
+                            $this->payment->fulfillOrder($locked->order);
+                        }
+                    }
+                });
             }
         }
 

@@ -75,7 +75,8 @@ class PaymentService
 
         } elseif ($order->provider === 'digital') {
             $digitalService = app(DigitalOrderService::class);
-            $userType = $order->user?->isReseller() ? 'reseller' : 'user';
+            $user = $order->user;
+            $userType = ($user?->isAdmin() || $user?->isReseller()) ? 'reseller' : 'user';
 
             $result = $digitalService->placeOrder(
                 $order->product_code,

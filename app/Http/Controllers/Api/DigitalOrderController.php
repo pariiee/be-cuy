@@ -39,7 +39,7 @@ class DigitalOrderController extends BaseApiController
         $kodeProduk    = $validated['kode_produk'];
         $quantity      = $validated['quantity'] ?? 1;
         $paymentMethod = $validated['payment_method'] ?? 'balance';
-        $userType      = $user->isReseller() ? 'reseller' : 'user';
+        $userType      = ($user->isAdmin() || $user->isReseller()) ? 'reseller' : 'user';
         $orderRef      = 'DIG-' . time() . '-' . Str::random(6);
 
         // Check product & price

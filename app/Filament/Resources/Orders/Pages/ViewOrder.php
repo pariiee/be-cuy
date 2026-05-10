@@ -11,7 +11,7 @@ class ViewOrder extends Page
 {
     protected static string $resource = OrderResource::class;
 
-    protected static string $view = 'filament.resources.orders.pages.view-order';
+    protected string $view = 'filament.resources.orders.pages.view-order';
 
     public Order $record;
 

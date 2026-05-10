@@ -277,8 +277,13 @@ class MidtransController extends BaseApiController
 
         $newStatus = $this->midtrans->mapStatus($transactionStatus, $fraudStatus);
 
-        DB::transaction(function () use ($deposit, $newStatus, $transactionId, $paymentType, $vaNumber, $notif, $transactionStatus, $fraudStatus) {
-            $deposit->update([
+        DB::transaction(function () use ($deposit, $newStatus, $transactionId, $paymentType, $vaNumber, $notif) {
+            $locked = Deposit::lockForUpdate()->find($deposit->id);
+            if (!$locked || in_array($locked->status, ['paid', 'failed'])) {
+                return; // Already processed
+            }
+
+            $locked->update([
                 'status'                   => $newStatus,
                 'midtrans_transaction_id'  => $transactionId,
                 'midtrans_payment_type'    => $paymentType,
@@ -289,7 +294,7 @@ class MidtransController extends BaseApiController
             ]);
 
             if ($newStatus === 'paid') {
-                $this->processPaidDeposit($deposit);
+                $this->processPaidDeposit($locked);
             }
         });
 
