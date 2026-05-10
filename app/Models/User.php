@@ -3,22 +3,18 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
-#[Fillable(['name', 'email', 'password', 'phone', 'balance', 'role', 'is_banned', 'ban_reason', 'api_token'])]
-#[Hidden(['password', 'remember_token'])]
+use Laravel\Sanctum\HasApiTokens;
+
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected static function boot(): void
     {
@@ -38,26 +34,53 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that are mass assignable.
      *
-     * @return array<string, string>
+     * @var array<int, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'balance' => 'decimal:2',
-            'is_banned' => 'boolean',
-        ];
-    }
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'balance',
+        'role',
+        'is_banned',
+        'api_token',
+    ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'balance' => 'integer',
+        'is_banned' => 'boolean',
+    ];
+
+    /**
+     * Filament Access Control
+     * Syarat agar user bisa login ke dashboard Filament
+     */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isAdmin();
+        // Hanya Admin yang tidak kena ban yang bisa masuk
+        return $this->isAdmin() && !$this->isBanned();
     }
 
-    // ── Role helpers ────────────────────────────────────────────
+    // ── Role Checks ──────────────────────────────────────────────
 
     public function isAdmin(): bool
     {
@@ -74,10 +97,8 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === 'member';
     }
 
-
     /**
-     * Check if user is exempt from product price markup.
-     * Admin and Reseller buy at base price (no markup).
+     * Cek apakah user bebas dari markup harga (Admin & Reseller)
      */
     public function isExemptFromMarkup(): bool
     {
